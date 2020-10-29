@@ -93,10 +93,19 @@ namespace AmongUsModLoaderInstaller
                     var steam = IsLinux
                         ? Environment.GetEnvironmentVariable("HOME") + "/.local/share/Steam/"
                         : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) + "/Steam/";
-                    prefixText1.Show();
-                    prefixText2.Show();
                     path.SetUri(steam + relativeGameSteamLocation);
-                    SetText(true);
+                    if (IsLinux)
+                    {
+                        prefixText1.Show();
+                        prefixText2.Show();
+                        SetText(true);
+                    }
+                    else
+                    {
+                        prefixText1.Hide();
+                        prefixText2.Hide();
+                        prefixPath.Hide();
+                    }
                     prefixPath.SetUri(steam);
                 }
                 else
@@ -138,14 +147,16 @@ namespace AmongUsModLoaderInstaller
             Application.Run();
         }
 
-        private static void Install(bool server, bool steamCheckActive, string pathCurrentFolder, string prefixPathCurrentFolder)
+        private static void Install(bool server, bool steam, string gameDir, string runDir)
         {
             if (!server && IsLinux)
             {
+                if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
+                
                 Process.Start(new ProcessStartInfo("/usr/bin/wine",
                     "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /d native,builtin")
                 {
-                    EnvironmentVariables = { ["WINEPREFIX"] = prefixPathCurrentFolder },
+                    EnvironmentVariables = { ["WINEPREFIX"] = runDir },
                     CreateNoWindow = true
                 });
             }
