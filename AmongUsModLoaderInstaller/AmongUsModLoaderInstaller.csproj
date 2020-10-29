@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net5.0</TargetFramework>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="GtkSharp" Version="3.22.25.128" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Include="Window.glade" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="bin\Debug\net5.0" />
+    </ItemGroup>
+
+</Project>
