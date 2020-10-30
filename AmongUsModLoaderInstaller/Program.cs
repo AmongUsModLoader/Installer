@@ -2,9 +2,11 @@
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using Gtk;
 
 namespace AmongUsModLoaderInstaller
@@ -134,11 +136,11 @@ namespace AmongUsModLoaderInstaller
                 }
             }
 
-            installButton.Clicked += (sender, args) =>
+            installButton.Clicked += async (sender, args) =>
             {
                 try
                 {
-                    Install(server, steamCheck.Active, path.CurrentFolder, prefixPath.CurrentFolder);
+                    await Install(server, steamCheck.Active, path.CurrentFolder, prefixPath.CurrentFolder);
                 }
                 catch (Exception e)
                 {
@@ -150,61 +152,30 @@ namespace AmongUsModLoaderInstaller
             Application.Run();
         }
 
-        private static void Install(bool server, bool steam, string gameDir, string runDir)
+        private static async Task Install(bool server, bool steam, string gameDir, string runDir)
         {
             if (!server && IsLinux)
             {
                 if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
-                
+
                 Process.Start(new ProcessStartInfo("/usr/bin/wine",
                     "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /d native,builtin")
                 {
-                    EnvironmentVariables = { ["WINEPREFIX"] = runDir },
+                    EnvironmentVariables = {["WINEPREFIX"] = runDir},
                     CreateNoWindow = true
                 });
-                
-                
-                var request = (HttpWebRequest) WebRequest.Create("https://api.github.com/repos/BepInEx/BepInEx/releases/latest");
-                request.Method = "GET";
-                request.UserAgent = "AmongUsModLoaderInstaller";
-                request.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
 
-                var response = (HttpWebResponse) request.GetResponse();
-                string content = string.Empty;
-                using(var sr = new StreamReader(response.GetResponseStream())) {
-                    content = sr.ReadToEnd();
-                }
-                
-                var options = new JsonSerializerOptions();
-                var s = JsonSerializer.Deserialize(content, typeof(JsonElement), options);
+                using var client = new HttpClient();
 
-                if (s is JsonElement bb) {
-                   Console.WriteLine(bb.GetProperty("url").GetString());
-                }
+                var url = JsonSerializer.Deserialize<LatestGithubRelease>(await client.GetStringAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest"))?.Url;
                 
             }
         }
-
-        private static string GetLatestVersion() {
-            var s = GetTheThing("https://api.github.com/repos/BepInEx/BepInEx/releases/latest");
-            if (s is JsonElement bb) return bb.GetProperty("url").GetString();
-            return null;
-        }
-
-        private static JsonElement? GetTheThing(string path) {
-            var request = (HttpWebRequest) WebRequest.Create(path);
-            request.Method = "GET";
-            request.UserAgent = "AmongUsModLoaderInstaller";
-            request.AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip;
-
-            var response = (HttpWebResponse) request.GetResponse();
-            string content = string.Empty;
-            using(var sr = new StreamReader(response.GetResponseStream())) {
-                content = sr.ReadToEnd();
-            }
-            
-            var options = new JsonSerializerOptions();
-            return JsonSerializer.Deserialize(content, typeof(JsonElement), options) as JsonElement?;
+        
+        private class LatestGithubRelease
+        {
+            [JsonPropertyName("url")]
+            public string Url { get; set; }
         }
     }
 }
