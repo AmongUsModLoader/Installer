@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -63,7 +64,7 @@ namespace AmongUsModLoaderInstaller
             {
                 if (steamCheck.Active)
                 {
-                    path.SetUri(prefixPath.CurrentFolder + "/" + relativeGameSteamLocation);
+                    path.SetCurrentFolder(prefixPath.CurrentFolder + "/" + relativeGameSteamLocation);
                 }
             };
 
@@ -99,7 +100,7 @@ namespace AmongUsModLoaderInstaller
                     var steam = IsLinux
                         ? Environment.GetEnvironmentVariable("HOME") + "/.local/share/Steam/"
                         : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) + "/Steam/";
-                    path.SetCurrentFolderUri(steam + relativeGameSteamLocation);
+                    path.SetCurrentFolder(steam + relativeGameSteamLocation);
 
                     if (IsLinux)
                     {
@@ -113,7 +114,7 @@ namespace AmongUsModLoaderInstaller
                         prefixText2.Hide();
                         prefixPath.Hide();
                     }
-                    prefixPath.SetCurrentFolderUri(steam);
+                    prefixPath.SetCurrentFolder(steam);
                 }
                 else
                 {
@@ -127,7 +128,7 @@ namespace AmongUsModLoaderInstaller
                         prefixText1.Show();
                         prefixText2.Show();
                         prefixPath.Show();
-                        prefixPath.SetCurrentFolderUri(Environment.GetEnvironmentVariable("HOME") + "/.wine/");
+                        prefixPath.SetCurrentFolder(Environment.GetEnvironmentVariable("HOME") + "/.wine/");
                     }
                     else
                     {
@@ -146,9 +147,8 @@ namespace AmongUsModLoaderInstaller
                 }
                 catch (Exception e)
                 {
-                    var dialog = new MessageDialog(window, DialogFlags.Modal, MessageType.Error, ButtonsType.Close, "{0}", e.Message);
+                    using var dialog = new MessageDialog(window, DialogFlags.Modal, MessageType.Error, ButtonsType.Close, "{0}", e.Message);
                     dialog.Run();
-                    dialog.Dispose();
                 }
             };
             window.DeleteEvent += (sender, args) => Application.Quit();
@@ -159,50 +159,60 @@ namespace AmongUsModLoaderInstaller
         private static async Task Install(bool server, bool steam, string gameDir, string runDir)
         {
             Console.WriteLine(gameDir);
-            if (!server && IsLinux)
+            if (server)
             {
-                if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
-
-                Process.Start(new ProcessStartInfo("/usr/bin/wine",
-                    "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /d native,builtin")
+                throw new NotImplementedException("Servers are not installable yet, sorry!");
+            }
+            else
+            {
+                /*if (IsLinux)
                 {
-                    EnvironmentVariables = {["WINEPREFIX"] = runDir},
-                    CreateNoWindow = true
-                });
+                    if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
+                    
+                    //TODO this doesn't check if they key already exists
+                    Process.Start(new ProcessStartInfo("/usr/bin/wine",
+                        "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /d native,builtin")
+                    {
+                        EnvironmentVariables = {["WINEPREFIX"] = runDir},
+                        CreateNoWindow = true
+                    });
+                }*/
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
-                
-                var url = JsonSerializer.Deserialize<LatestGithubRelease>(await client.GetStringAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest"))?.Url;
-               
+
+                var url = JsonSerializer
+                    .Deserialize<GithubRelease>(
+                        await client.GetStringAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest"))
+                    ?.Url;
+
                 var prop = JsonSerializer.Deserialize<AssetsProp>(await client.GetStringAsync(url));
-                
-                string? x86url = null;
-                foreach (var downloadableProp in prop.Assets) {
-                    //Find whatever file has x86 because among us is a 32 bit game
-                    if (downloadableProp.Name.Contains("x86")) {
-                        x86url = downloadableProp.Url;
-                        break;
-                    }
-                }
+
+                var x86Url = (from downloadableProp in prop.Assets where downloadableProp.Name.Contains("x86") select downloadableProp.Url).FirstOrDefault();
 
                 if (!gameDir.EndsWith("/")) gameDir += "/";
-                
+
                 string zip = gameDir + "BepInEx.zip";
-                
-                if (x86url == null) {
+
+                if (x86Url == null)
+                {
                     //TODO tell the user that the x86 file for bepinex wasnt found and make them select it from the prop.Assets
                 }
-                else {
-                    var response = await client.GetAsync(x86url);
-                    using (var fs = new FileStream(zip, FileMode.CreateNew)) await response.Content.CopyToAsync(fs);
+                else
+                {
+                    var response = await client.GetAsync(x86Url);
+                    await using (var fs = File.OpenWrite(zip))
+                    {
+                        await response.Content.CopyToAsync(fs);
+                    }
+                    
                     ZipFile.ExtractToDirectory(zip, gameDir + "/");
                     File.Delete(zip);
                 }
             }
         }
-        
-        private class LatestGithubRelease
+
+        private class GithubRelease
         {
             [JsonPropertyName("url")]
             public string Url { get; set; }
@@ -216,7 +226,7 @@ namespace AmongUsModLoaderInstaller
         
         private class DownloadableProp
         {
-            [JsonPropertyName("url")]
+            [JsonPropertyName("browser_download_url")]
             public string Url { get; set; }
             
             [JsonPropertyName("name")]
