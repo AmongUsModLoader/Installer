@@ -165,7 +165,7 @@ namespace AmongUsModLoaderInstaller
             }
             else
             {
-                /*if (IsLinux)
+                if (IsLinux)
                 {
                     if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
                     
@@ -176,7 +176,7 @@ namespace AmongUsModLoaderInstaller
                         EnvironmentVariables = {["WINEPREFIX"] = runDir},
                         CreateNoWindow = true
                     });
-                }*/
+                }
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
