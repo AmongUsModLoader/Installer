@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -98,7 +99,8 @@ namespace AmongUsModLoaderInstaller
                     var steam = IsLinux
                         ? Environment.GetEnvironmentVariable("HOME") + "/.local/share/Steam/"
                         : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) + "/Steam/";
-                    path.SetUri(steam + relativeGameSteamLocation);
+                    path.SetCurrentFolderUri(steam + relativeGameSteamLocation);
+
                     if (IsLinux)
                     {
                         prefixText1.Show();
@@ -111,7 +113,7 @@ namespace AmongUsModLoaderInstaller
                         prefixText2.Hide();
                         prefixPath.Hide();
                     }
-                    prefixPath.SetUri(steam);
+                    prefixPath.SetCurrentFolderUri(steam);
                 }
                 else
                 {
@@ -125,7 +127,7 @@ namespace AmongUsModLoaderInstaller
                         prefixText1.Show();
                         prefixText2.Show();
                         prefixPath.Show();
-                        prefixPath.SetUri(Environment.GetEnvironmentVariable("HOME") + "/.wine/");
+                        prefixPath.SetCurrentFolderUri(Environment.GetEnvironmentVariable("HOME") + "/.wine/");
                     }
                     else
                     {
@@ -144,7 +146,9 @@ namespace AmongUsModLoaderInstaller
                 }
                 catch (Exception e)
                 {
-                    new MessageDialog(window, DialogFlags.Modal, MessageType.Error, ButtonsType.Ok, "{0}", e.Message).Show();
+                    var dialog = new MessageDialog(window, DialogFlags.Modal, MessageType.Error, ButtonsType.Close, "{0}", e.Message);
+                    dialog.Run();
+                    dialog.Dispose();
                 }
             };
             window.DeleteEvent += (sender, args) => Application.Quit();
@@ -154,6 +158,7 @@ namespace AmongUsModLoaderInstaller
 
         private static async Task Install(bool server, bool steam, string gameDir, string runDir)
         {
+            Console.WriteLine(gameDir);
             if (!server && IsLinux)
             {
                 if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
@@ -166,9 +171,34 @@ namespace AmongUsModLoaderInstaller
                 });
 
                 using var client = new HttpClient();
-
-                var url = JsonSerializer.Deserialize<LatestGithubRelease>(await client.GetStringAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest"))?.Url;
+                client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
                 
+                var url = JsonSerializer.Deserialize<LatestGithubRelease>(await client.GetStringAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest"))?.Url;
+               
+                var prop = JsonSerializer.Deserialize<AssetsProp>(await client.GetStringAsync(url));
+                
+                string? x86url = null;
+                foreach (var downloadableProp in prop.Assets) {
+                    //Find whatever file has x86 because among us is a 32 bit game
+                    if (downloadableProp.Name.Contains("x86")) {
+                        x86url = downloadableProp.Url;
+                        break;
+                    }
+                }
+
+                if (!gameDir.EndsWith("/")) gameDir += "/";
+                
+                string zip = gameDir + "BepInEx.zip";
+                
+                if (x86url == null) {
+                    //TODO tell the user that the x86 file for bepinex wasnt found and make them select it from the prop.Assets
+                }
+                else {
+                    var response = await client.GetAsync(x86url);
+                    using (var fs = new FileStream(zip, FileMode.CreateNew)) await response.Content.CopyToAsync(fs);
+                    ZipFile.ExtractToDirectory(zip, gameDir + "/");
+                    File.Delete(zip);
+                }
             }
         }
         
@@ -176,6 +206,21 @@ namespace AmongUsModLoaderInstaller
         {
             [JsonPropertyName("url")]
             public string Url { get; set; }
+        }
+        
+        private class AssetsProp
+        {
+            [JsonPropertyName("assets")]
+            public DownloadableProp[] Assets { get; set; }
+        }
+        
+        private class DownloadableProp
+        {
+            [JsonPropertyName("url")]
+            public string Url { get; set; }
+            
+            [JsonPropertyName("name")]
+            public string Name { get; set; }
         }
     }
 }
