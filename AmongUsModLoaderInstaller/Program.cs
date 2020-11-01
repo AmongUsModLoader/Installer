@@ -58,8 +58,7 @@ namespace AmongUsModLoaderInstaller
                 }
             }
 
-            //TODO please remember to change this back before pushing
-            const string relativeGameSteamLocation = "steamapps/common/Among_Us2/";
+            const string relativeGameSteamLocation = "steamapps/common/Among Us/";
             var steamCheck = Get<CheckButton>("steam_check");
             steamCheck.Active = true;
 
@@ -222,7 +221,6 @@ namespace AmongUsModLoaderInstaller
                             new[] {typeof(string[])}, null);
                     if (method != null)
                     {
-                        var data = gameDir + "/Among Us_Data/il2cpp_data/";
                         var dump = tempPath + "AssemblyDump/";
                         Directory.CreateDirectory(dump);
                         method.Invoke(null, new object[]
@@ -242,6 +240,8 @@ namespace AmongUsModLoaderInstaller
                             //TODO I have no idea where to get this library from
                             MscorlibPath = gameDir + "/mscorlib.dll"
                         });
+
+                        Directory.CreateDirectory(gameDir + "/Mods/");
                     }
                 }
                 else
