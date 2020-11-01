@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -9,11 +8,8 @@ using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using AssemblyUnhollower;
 using Gtk;
-using Il2CppDumper;
 
 namespace AmongUsModLoaderInstaller
 {
@@ -171,29 +167,29 @@ namespace AmongUsModLoaderInstaller
             }
             else
             {
+                var wineCommand = "/usr/bin/wine";
                 if (IsLinux)
                 {
-                    var command = "/usr/bin/wine";
                     if (steam)
                     {
                         static IEnumerable<string> GetProtonFolders(string dir)
                         {
                             return from folder in Directory.GetDirectories(dir) 
                                 where folder.Contains("Proton") 
-                                select dir + folder;
+                                select folder;
                         }
 
                         var protonFolders = GetProtonFolders(runDir + "/steamapps/common/").Concat(GetProtonFolders(gameDir + "/../"));
                         var highestVersion = protonFolders.OrderByDescending(folder => double.TryParse(folder, out var version) ? version : 0).FirstOrDefault();
                         if (highestVersion != null)
                         {
-                            command = highestVersion + "/dist/bin/wine";
+                            wineCommand = highestVersion + "/dist/bin/wine";
                         }
                         
                         runDir += "/steamapps/compatdata/945360/pfx/";
                     }
 
-                    Process.Start(new ProcessStartInfo(command,
+                    Process.Start(new ProcessStartInfo(wineCommand,
                         "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /f /d native,builtin")
                     {
                         EnvironmentVariables = {["WINEPREFIX"] = runDir},
@@ -208,13 +204,13 @@ namespace AmongUsModLoaderInstaller
                 (string, string)? asset = null;
 
                 var release = await JsonDocument.ParseAsync(
-                    await client.GetStreamAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest"));
+                    await client.GetStreamAsync("https://api.github.com/repos/AmongUsModLoader/ModLoader/releases/latest"));
                 var assets = release.RootElement.GetProperty("assets");
                 for (var i = 0; i < assets.GetArrayLength(); i++)
                 {
                     var assetElement = assets[i];
                     var name = assetElement.GetProperty("name").GetString();
-                    if (name == null || !name.Contains("x86")) continue;
+                    if (name == null || !name.Contains("client")) continue;
                     asset = (assetElement.GetProperty("browser_download_url").GetString()!, name);
                     break;
                 }
@@ -232,33 +228,6 @@ namespace AmongUsModLoaderInstaller
                     }
 
                     ZipFile.ExtractToDirectory(path, gameDir + "/", true);
-                    var method = typeof(Config).Assembly.GetType("Il2CppDumper.Program")
-                        ?.GetMethod("Main", BindingFlags.Static | BindingFlags.NonPublic, null,
-                            new[] {typeof(string[])}, null);
-                    if (method != null)
-                    {
-                        var dump = tempPath + "AssemblyDump/";
-                        Directory.CreateDirectory(dump);
-                        method.Invoke(null, new object[]
-                        {
-                            new[]
-                            {
-                                gameDir + "/GameAssembly.dll",
-                                gameDir + "/Among Us_Data/il2cpp_data/Metadata/global-metadata.dat",
-                                dump
-                            }
-                        });
-
-                        AssemblyUnhollower.Program.Main(new UnhollowerOptions
-                        {
-                            SourceDir = dump,
-                            OutputDir = gameDir + "/BepInEx/unhollowed/",
-                            //TODO I have no idea where to get this library from
-                            MscorlibPath = gameDir + "/mscorlib.dll"
-                        });
-
-                        Directory.CreateDirectory(gameDir + "/Mods/");
-                    }
                 }
                 else
                 {

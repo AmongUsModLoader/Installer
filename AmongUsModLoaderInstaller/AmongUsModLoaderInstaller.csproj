@@ -11,13 +11,6 @@
     </ItemGroup>
     
     <ItemGroup>
-        <ProjectReference Include="../Il2CppDumper/Il2CppDumper/Il2CppDumper.csproj" />
-        <ProjectReference Include="../Il2CppAssemblyUnhollower/UnhollowerBaseLib/UnhollowerBaseLib.csproj" />
-        <ProjectReference Include="../Il2CppAssemblyUnhollower/UnhollowerRuntimeLib/UnhollowerRuntimeLib.csproj" />
-        <ProjectReference Include="../Il2CppAssemblyUnhollower/AssemblyUnhollower/AssemblyUnhollower.csproj" />
-    </ItemGroup>
-    
-    <ItemGroup>
       <EmbeddedResource Include="Window.glade" />
     </ItemGroup>
 
