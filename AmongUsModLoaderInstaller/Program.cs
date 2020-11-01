@@ -171,19 +171,18 @@ namespace AmongUsModLoaderInstaller
             }
             else
             {
-                /*if (IsLinux)
+                if (IsLinux)
                 {
                     if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
 
                     //TODO this doesn't check if they key already exists
-                    
                     Process.Start(new ProcessStartInfo("/usr/bin/wine",
                         "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /d native,builtin")
                     {
                         EnvironmentVariables = {["WINEPREFIX"] = runDir},
                         CreateNoWindow = true
                     });
-                }*/
+                }
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
