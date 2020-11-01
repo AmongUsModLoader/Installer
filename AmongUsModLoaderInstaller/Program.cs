@@ -1,15 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using AssemblyUnhollower;
 using Gtk;
+using Il2CppDumper;
 
 namespace AmongUsModLoaderInstaller
 {
@@ -54,7 +58,8 @@ namespace AmongUsModLoaderInstaller
                 }
             }
 
-            const string relativeGameSteamLocation = "steamapps/common/Among Us/";
+            //TODO please remember to change this back before pushing
+            const string relativeGameSteamLocation = "steamapps/common/Among_Us2/";
             var steamCheck = Get<CheckButton>("steam_check");
             steamCheck.Active = true;
 
@@ -149,8 +154,9 @@ namespace AmongUsModLoaderInstaller
                 catch (Exception e)
                 {
                     using var dialog = new MessageDialog(window, DialogFlags.Modal, MessageType.Error,
-                        ButtonsType.Close, "{0}", e.Message);
+                        ButtonsType.Close, false, "{0}: {1}\n{2}", e, e.Message, e.StackTrace);
                     dialog.Run();
+                    throw;
                 }
             };
             window.DeleteEvent += (sender, args) => Application.Quit();
@@ -160,14 +166,13 @@ namespace AmongUsModLoaderInstaller
 
         private static async Task Install(bool server, bool steam, string gameDir, string runDir)
         {
-            Console.WriteLine(gameDir);
             if (server)
             {
                 throw new NotImplementedException("Servers are not installable yet, sorry!");
             }
             else
             {
-                if (IsLinux)
+                /*if (IsLinux)
                 {
                     if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
 
@@ -179,54 +184,71 @@ namespace AmongUsModLoaderInstaller
                         EnvironmentVariables = {["WINEPREFIX"] = runDir},
                         CreateNoWindow = true
                     });
+                }*/
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
+
+                var tempPath = gameDir + "/.temp/";
+                (string, string)? asset = null;
+
+                var release = await JsonDocument.ParseAsync(
+                    await client.GetStreamAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest"));
+                var assets = release.RootElement.GetProperty("assets");
+                for (var i = 0; i < assets.GetArrayLength(); i++)
+                {
+                    var assetElement = assets[i];
+                    var name = assetElement.GetProperty("name").GetString();
+                    if (name == null || !name.Contains("x86")) continue;
+                    asset = (assetElement.GetProperty("browser_download_url").GetString()!, name);
+                    break;
                 }
 
-                using (var client = new HttpClient())
+                if (asset.HasValue)
                 {
-                    client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
-                    
-                    var tempPath = gameDir + "/.temp/";
-                    var prop = JsonSerializer.Deserialize<AssetsProp>(
-                        await client.GetStringAsync("https://api.github.com/repos/BepInEx/BepInEx/releases/latest")); 
-                    (string, string)? asset = 
-                        (
-                            from downloadableProp in prop?.Assets 
-                            where downloadableProp?.Name.Contains("x86") == true
-                            select (downloadableProp.Url!, downloadableProp.Name!)
-                        ).FirstOrDefault();
-
-                    if (asset.HasValue)
+                    var (url, name) = asset.Value;
+                    var path = tempPath + name;
+                    if (!File.Exists(path))
                     {
-                        var (url, name) = asset.Value;
-                        var path = tempPath + name;
-                        if (!File.Exists(path))
+                        Directory.CreateDirectory(tempPath);
+                        var response = await client.GetAsync(url);
+                        await using var fs = File.OpenWrite(path);
+                        await response.Content.CopyToAsync(fs);
+                    }
+
+                    ZipFile.ExtractToDirectory(path, gameDir + "/", true);
+                    var method = typeof(Config).Assembly.GetType("Il2CppDumper.Program")
+                        ?.GetMethod("Main", BindingFlags.Static | BindingFlags.NonPublic, null,
+                            new[] {typeof(string[])}, null);
+                    if (method != null)
+                    {
+                        var data = gameDir + "/Among Us_Data/il2cpp_data/";
+                        var dump = tempPath + "AssemblyDump/";
+                        Directory.CreateDirectory(dump);
+                        method.Invoke(null, new object[]
                         {
-                            Directory.CreateDirectory(tempPath);
-                            var response = await client.GetAsync(url);
-                            await using var fs = File.OpenWrite(path);
-                            await response.Content.CopyToAsync(fs);
-                        }
+                            new[]
+                            {
+                                gameDir + "/GameAssembly.dll",
+                                gameDir + "/Among Us_Data/il2cpp_data/Metadata/global-metadata.dat",
+                                dump
+                            }
+                        });
 
-                        ZipFile.ExtractToDirectory(path, gameDir + "/");
+                        AssemblyUnhollower.Program.Main(new UnhollowerOptions
+                        {
+                            SourceDir = dump,
+                            OutputDir = gameDir + "/BepInEx/unhollowed/",
+                            //TODO I have no idea where to get this library from
+                            MscorlibPath = gameDir + "/mscorlib.dll"
+                        });
                     }
-                    else
-                    {
-                        //TODO tell the user that the x86 file for bepinex wasnt found and make them select it from the prop.Assets
-                    }
+                }
+                else
+                {
+                    //TODO tell the user that the x86 file for bepinex wasnt found and make them select it from the prop.Assets
                 }
             }
-        }
-
-        private class AssetsProp
-        {
-            [JsonPropertyName("assets")] public IEnumerable<DownloadableProp> Assets { get; } = Array.Empty<DownloadableProp>();
-        }
-
-        private class DownloadableProp
-        {
-            [JsonPropertyName("browser_download_url")] public string Url { get; } = "";
-
-            [JsonPropertyName("name")] public string Name { get; } = "";
         }
     }
 }
