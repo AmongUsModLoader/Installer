@@ -2,17 +2,18 @@
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net472</TargetFramework>
+        <TargetFramework>netcoreapp5.0</TargetFramework>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="GtkSharp" Version="3.22.25.128" />
-        <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
-        <PackageReference Include="System.Net.Http" Version="4.3.4" />
     </ItemGroup>
-
+    
     <ItemGroup>
         <ProjectReference Include="../Il2CppDumper/Il2CppDumper/Il2CppDumper.csproj" />
+        <ProjectReference Include="../Il2CppAssemblyUnhollower/UnhollowerBaseLib/UnhollowerBaseLib.csproj" />
+        <ProjectReference Include="../Il2CppAssemblyUnhollower/UnhollowerRuntimeLib/UnhollowerRuntimeLib.csproj" />
         <ProjectReference Include="../Il2CppAssemblyUnhollower/AssemblyUnhollower/AssemblyUnhollower.csproj" />
     </ItemGroup>
     
