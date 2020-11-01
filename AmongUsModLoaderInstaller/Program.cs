@@ -173,11 +173,28 @@ namespace AmongUsModLoaderInstaller
             {
                 if (IsLinux)
                 {
-                    if (steam) runDir += "/steamapps/compatdata/945360/pfx/";
+                    var command = "/usr/bin/wine";
+                    if (steam)
+                    {
+                        static IEnumerable<string> GetProtonFolders(string dir)
+                        {
+                            return from folder in Directory.GetDirectories(dir) 
+                                where folder.Contains("Proton") 
+                                select dir + folder;
+                        }
 
-                    //TODO this doesn't check if they key already exists
-                    Process.Start(new ProcessStartInfo("/usr/bin/wine",
-                        "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /d native,builtin")
+                        var protonFolders = GetProtonFolders(runDir + "/steamapps/common/").Concat(GetProtonFolders(gameDir + "/../"));
+                        var highestVersion = protonFolders.OrderByDescending(folder => double.TryParse(folder, out var version) ? version : 0).FirstOrDefault();
+                        if (highestVersion != null)
+                        {
+                            command = highestVersion + "/dist/bin/wine";
+                        }
+                        
+                        runDir += "/steamapps/compatdata/945360/pfx/";
+                    }
+
+                    Process.Start(new ProcessStartInfo(command,
+                        "REG ADD HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides /v winhttp /t REG_SZ /f /d native,builtin")
                     {
                         EnvironmentVariables = {["WINEPREFIX"] = runDir},
                         CreateNoWindow = true
