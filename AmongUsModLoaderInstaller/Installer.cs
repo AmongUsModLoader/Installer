@@ -116,6 +116,8 @@ namespace AmongUsModLoaderInstaller
 
                     File.Copy(path, gameDir + "/BepInEx/plugins/" + name, true);
                 }
+                
+                Environment.SetEnvironmentVariable("AMONG_US_PATH", gameDir, EnvironmentVariableTarget.User);
             }
         }
     }
