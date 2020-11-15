@@ -96,10 +96,10 @@ namespace AmongUsModLoaderInstaller
                     break;
                 }
 
-                await DownloadPlugin(apiAsset);
-                await DownloadPlugin(clientAsset);
+                await DownloadPlugin(client, apiAsset);
+                await DownloadPlugin(client, clientAsset);
 
-                async ValueTask DownloadPlugin((string, string)? asset)
+                async ValueTask DownloadPlugin(HttpClient httpClient, (string, string)? asset)
                 {
                     if (!asset.HasValue) return;
 
@@ -108,8 +108,8 @@ namespace AmongUsModLoaderInstaller
 
                     if (!File.Exists(path))
                     {
-                        Directory.CreateDirectory(tempPath!);
-                        var response = await client!.GetAsync(url);
+                        Directory.CreateDirectory(tempPath);
+                        var response = await httpClient.GetAsync(url);
                         await using var fs = File.OpenWrite(path);
                         await response.Content.CopyToAsync(fs);
                     }

@@ -51,7 +51,7 @@ namespace AmongUsModLoaderInstaller
                 }
                 
                 var directorySpecified = options.ContainsKey("dir");
-                var directory = "";
+                string directory;
 
                 if (directorySpecified)
                 {
